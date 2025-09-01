@@ -1,0 +1,68 @@
+name: Matteo Daily Check-ins
+
+on:
+  # Runs every day at 07:00 and 21:00 Madrid time
+  schedule:
+    - cron: "0 5 * * *"   # 07:00 Europe/Madrid (cron is UTC; Madrid ~ UTC+2 in Sep)
+    - cron: "0 19 * * *"  # 21:00 Europe/Madrid (19:00 UTC)
+  workflow_dispatch: {}    # allows manual run from the Actions tab
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Matteo check-in issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const now = new Date();
+            // Decide morning vs evening by UTC hour
+            const hourUTC = now.getUTCHours();
+            const y = now.toISOString().slice(0,10); // YYYY-MM-DD
+
+            const isMorning = (hourUTC === 5);   // 07:00 Madrid ~ 05:00 UTC
+            const title = isMorning
+              ? `Matteo — Morning Check-in ${y}`
+              : `Matteo — Evening Check-in ${y}`;
+
+            const fullMantra = "I don’t need this now. Let’s decide later and be happy with my choice.";
+            const shortMantra = "Not now. Later, and a good decision.";
+
+            const bodyMorning = `
+**You are a non-smoker today.**
+**Mantra:** ${fullMantra}
+
+**Plan for cravings today (2–5 min waves):**
+- Replacement action: (walk / water / push-ups / breath)
+- High-risk times: (commute, after meals, social, etc.)
+
+**Health quickies**
+- Sleep last night (hrs): 
+- Morning weight (kg): 
+- Today’s training: 
+`;
+
+            const bodyEvening = `
+**Evening reflection**
+**Mantra (shorthand):** ${shortMantra}
+
+- Cravings (low / medium / high) and how you handled them:
+- Any slips:
+- Cigarettes avoided today: 
+- Triggers noticed: 
+- Food / training balance today:
+
+*Progress compounds. One steady day at a time.*
+`;
+
+            const body = isMorning ? bodyMorning : bodyEvening;
+
+            const { data: issue } = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ["matteo", isMorning ? "morning" : "evening", "health", "smoking"]
+            });
+
+            core.info(`Created issue #${issue.number} — ${issue.title}`);
